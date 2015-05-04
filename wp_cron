@@ -3,6 +3,8 @@
 # Script Defaults
 INTERVAL="60s"
 VERBOSE=false
+MULTISITE=false
+STATUS_OK="200"
 
 # trap keyboard interrupt (control-c)
 trap script_interrupt SIGINT
@@ -65,6 +67,7 @@ runtime_stats() {
 	echo "Interval: $INTERVAL"
 	echo "Domain: $DOMAIN"
 	echo "Verbose: $VERBOSE"
+	echo "Multisite: $MULTISITE"
 	echo "===================="
 }
 
@@ -78,6 +81,55 @@ loop_cron() {
 		run_cron
 		sleep $INTERVAL
 	done	
+}
+
+loop_multisite_cron() {
+	fetch_mysql_credentials
+	fetch_multisite_blogs
+
+	# loop through blogs
+	for BLOG in $BLOGS; do
+		URL="{$BLOG}wp-cron.php?doing_wp_cron"
+		STATUS=`curl -s -I ${URL} | grep HTTP/1.1 | awk {'print $2'}`
+
+		if [ ! "$STATUS" == "${STATUS_OK}" ]; then
+				echo "ERROR - unable to reach blog: ${BLOG}"
+				echo "exiting wp-cron script (${script_name})"
+				exit;
+		fi
+
+		echo "Finished running wp-cron on: ${BLOG}"
+		sleep 5
+	done;
+}
+
+fetch_multisite_blogs() {
+	SQL="""
+	SELECT
+		CONCAT(domain, path)
+	FROM
+		${WP_BLOGS_TABLE}
+	WHERE
+		archived='0' AND
+		spam='0' AND
+		deleted='0';
+	""";
+
+	BLOGS=`mysql \
+		-u${MYSQL_USERNAME} \
+		-p${MYSQL_PASSWORD} \
+		--silent \
+		--skip-column-names \
+		${MYSQL_DATABASE} \
+		--execute "${SQL}"`
+}
+
+fetch_mysql_credentials() {
+	MYSQL_USERNAME=`cat wp-config.php | grep DB_USER | cut -d \' -f 4`;
+	MYSQL_PASSWORD=`cat wp-config.php | grep DB_PASSWORD | cut -d \' -f 4`;
+	MYSQL_DATABASE=`cat wp-config.php | grep DB_NAME | cut -d \' -f 4`;
+	WP_TABLE_PREFIX=`sed '/^$table_prefix *= *'\''\(.*\)'\''.*$/!d;s//\1/g' wp-config.php`;
+	WP_BLOGS_TABLE="${WP_TABLE_PREFIX}blogs";
 }
 
 parse_args() {
@@ -101,6 +153,10 @@ parse_args() {
 					shift 2
 					continue
 				fi;
+				;;
+
+			-m|--multisite)
+				MULTISITE=true
 				;;
 			
 			-v|--verbose)
@@ -135,6 +191,8 @@ fi
 if [ -z "$DOMAIN" ]; then
 	usage
 	exit 0
+elif [ "$MULTISITE" = true ]; then
+	loop_multisite_cron
 else
 	loop_cron
 fi
