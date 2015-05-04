@@ -42,6 +42,9 @@ usage() {
 				
 		--interval (-i)
 			Sets the amount of time between wp-cron.php calls
+
+		--multisite (-m)
+			Find all blogs in the multisite and do wp-cron on them
 	
 		--verbose (-v)
 			Use curl instead of wget to show cron responses
@@ -78,14 +81,23 @@ loop_cron() {
 	# run the loop
 	while true; do
 		echo "Running cron" `date +%H:%M:%S`
-		run_cron
+
+		if [ "$MULTISITE" = true ]; then
+			loop_multisite_cron
+		else
+			run_cron
+		fi
+
 		sleep $INTERVAL
 	done	
 }
 
 loop_multisite_cron() {
-	fetch_mysql_credentials
-	fetch_multisite_blogs
+	# make sure we have blogs
+	if [ -z "$BLOGS" ]; then
+		fetch_mysql_credentials
+		fetch_multisite_blogs
+	fi
 
 	# loop through blogs
 	for BLOG in $BLOGS; do
@@ -99,7 +111,7 @@ loop_multisite_cron() {
 		fi
 
 		echo "Finished running wp-cron on: ${BLOG}"
-		sleep 5
+		sleep 2s
 	done;
 }
 
@@ -191,8 +203,6 @@ fi
 if [ -z "$DOMAIN" ]; then
 	usage
 	exit 0
-elif [ "$MULTISITE" = true ]; then
-	loop_multisite_cron
 else
 	loop_cron
 fi

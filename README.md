@@ -16,6 +16,9 @@ Flags:
 				
 	--interval (-i)
 		Sets the amount of time between wp-cron.php calls
+
+	--multisite (-m)
+		Find all blogs in the multisite and do wp-cron on them
 	
 	--verbose (-v)
 		Use curl instead of wget to show cron responses
