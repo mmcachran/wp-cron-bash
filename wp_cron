@@ -1,0 +1,140 @@
+#!/bin/sh
+
+# Script Defaults
+INTERVAL="60s"
+VERBOSE=false
+
+# trap keyboard interrupt (control-c)
+trap script_interrupt SIGINT
+
+script_interrupt() {
+        echo ""
+        echo "*** Script Interrupted ***"
+        
+        cleanup
+        
+        echo "*** Exiting ***"
+
+        exit $?
+}
+
+# @ToDo - implement logging and then remove it here
+cleanup() {
+	echo "running cleanup"
+}
+
+usage() {
+	cat << EOF
+	USAGE: wp_cron --domain <base site url> --interval <delay time> --verbose
+	
+	Possible delay time values:
+		s for seconds (default)
+		m for minutes
+		h for hours
+		d for days
+
+	Flags:
+		--domain (-d)
+			Sets the base domain to call wp-cron.php on.
+				Note: If DOMAIN_CURRENT_SITE is defined in wp-config.php and you're running this command from your base install directory, --domain can be omitted.
+				
+		--interval (-i)
+			Sets the amount of time between wp-cron.php calls
+	
+		--verbose (-v)
+			Use curl instead of wget to show cron responses
+			
+	
+	EXAMPLE: wp_cron -d msnc.dev -i 60s -v
+EOF
+}
+
+parse_wp_config() {
+	DOMAIN=`cat wp-config.php | grep DOMAIN_CURRENT_SITE | cut -d \' -f 4`
+}
+
+run_cron() {
+	if [ "$VERBOSE" = true ]; then
+		curl -I http://$DOMAIN/wp-cron.php?doing_wp_cron
+	else
+		wget --quiet --output-document=/dev/null http://$DOMAIN/wp-cron.php?doing_wp_cron
+	fi;
+}
+
+runtime_stats() {
+	echo "Interval: $INTERVAL"
+	echo "Domain: $DOMAIN"
+	echo "Verbose: $VERBOSE"
+	echo "===================="
+}
+
+loop_cron() {
+	# show the stats
+	runtime_stats
+	
+	# run the loop
+	while true; do
+		echo "Running cron" `date +%H:%M:%S`
+		run_cron
+		sleep $INTERVAL
+	done	
+}
+
+parse_args() {
+	while [ "$#" -gt 0 ]; do
+		case $1 in
+			-h|-\?|\?|--help)
+				usage
+				exit 0
+				;;
+			-i|--interval)
+				if [ "$#" -gt 1 ]; then
+					INTERVAL=$2
+					shift 2
+					continue
+				fi;
+				;;
+
+			-d|--domain)
+				if [ "$#" -gt 1 ]; then
+					DOMAIN=$2
+					shift 2
+					continue
+				fi;
+				;;
+			
+			-v|--verbose)
+				VERBOSE=true
+				;;
+				
+			--)
+				shift
+				break
+				;;
+			
+			-?*)
+				printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2
+				;;
+			
+			*)
+				break
+		esac
+		
+		shift
+	done
+}
+
+parse_args $@
+
+# if no domain is set yet, try to figure it out with wp-config.php
+if [[ -z "$DOMAIN" && -f "wp-config.php" ]]; then
+	parse_wp_config
+fi
+
+# check to make sure we have a domain
+if [ -z "$DOMAIN" ]; then
+	usage
+	exit 0
+else
+	loop_cron
+fi
