@@ -6,7 +6,7 @@ VERBOSE=false
 MULTISITE=false
 STATUS_OK="200"
 
-# trap keyboard interrupt (control-c)
+# Trap keyboard interrupt (control-c).
 trap script_interrupt SIGINT
 
 script_interrupt() {
@@ -20,7 +20,7 @@ script_interrupt() {
         exit $?
 }
 
-# @ToDo - implement logging and then remove it here
+# @ToDo - implement logging and then remove it here.
 cleanup() {
 	echo "running cleanup"
 }
@@ -93,13 +93,13 @@ loop_cron() {
 }
 
 loop_multisite_cron() {
-	# make sure we have blogs
+	# Make sure we have blogs.
 	if [ -z "$BLOGS" ]; then
 		fetch_mysql_credentials
 		fetch_multisite_blogs
 	fi
 
-	# loop through blogs
+	# Loop through blogs.
 	for BLOG in $BLOGS; do
 		URL="{$BLOG}wp-cron.php?doing_wp_cron"
 		STATUS=`curl -s -I ${URL} | grep HTTP/1.1 | awk {'print $2'}`
@@ -194,12 +194,12 @@ parse_args() {
 
 parse_args $@
 
-# if no domain is set yet, try to figure it out with wp-config.php
+# If no domain is set yet, try to figure it out with wp-config.php.
 if [[ -z "$DOMAIN" && -f "wp-config.php" ]]; then
 	parse_wp_config
 fi
 
-# check to make sure we have a domain
+# Check to make sure we have a domain.
 if [ -z "$DOMAIN" ]; then
 	usage
 	exit 0
