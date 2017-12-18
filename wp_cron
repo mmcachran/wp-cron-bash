@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Script Defaults
+# Script Defaults.
 INTERVAL="60s"
 VERBOSE=false
 MULTISITE=false
